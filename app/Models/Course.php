@@ -8,12 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Course extends Model
 {
     public const AREAS = [
-        'Saúde, Estética, Cuidado Humano e Medicamentos',
-        'Informática, Tecnologia da Informação e Comunicação',
+        'Saúde',
+        'Informação e Comunicação',
         'Gestão e Negócios',
         'Controle e Processos Industriais',
-        'Engenharias, Construção Civil, Arquitetura e Infraestrutura',
-        'Agronegócio, Agroindústria, Agropecuária, Produção e Recursos Naturais',
+        'Infraestrutura',
+        'Produção e Recursos Naturais',
         'Jurídica',
     ];
 

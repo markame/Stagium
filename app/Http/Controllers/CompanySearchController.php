@@ -113,12 +113,12 @@ class CompanySearchController extends Controller
     private function queryForCourse(Course $course): string
     {
         $term = match ($course->area) {
-            'Saúde, Estética, Cuidado Humano e Medicamentos' => 'saúde estética cuidado humano medicamentos hospital clínica consultório laboratório farmácia odontologia fisioterapia psicologia enfermagem',
-            'Informática, Tecnologia da Informação e Comunicação' => 'informática tecnologia da informação comunicação software hardware redes telecomunicações internet suporte técnico dados',
+            'Saúde' => 'saúde hospital clínica consultório laboratório farmácia odontologia fisioterapia psicologia enfermagem estética medicamentos cuidado humano',
+            'Informação e Comunicação' => 'informação comunicação informática tecnologia da informação software hardware redes telecomunicações internet suporte técnico dados mídia comunicação visual',
             'Gestão e Negócios' => 'gestão negócios administração contabilidade consultoria recursos humanos financeiro banco comércio escritório',
             'Controle e Processos Industriais' => 'indústria fábrica manutenção automação controle de qualidade produção mecânica elétrica processos industriais',
-            'Engenharias, Construção Civil, Arquitetura e Infraestrutura' => 'engenharias construção civil arquitetura infraestrutura obras saneamento energia logística transporte manutenção predial',
-            'Agronegócio, Agroindústria, Agropecuária, Produção e Recursos Naturais' => 'agronegócio agroindústria agropecuária fazendas produção recursos naturais agricultura pecuária meio ambiente alimentos mineração pesca silvicultura',
+            'Infraestrutura' => 'infraestrutura construção engenharia arquitetura obras saneamento energia logística transporte manutenção predial',
+            'Produção e Recursos Naturais' => 'produção recursos naturais agronegócio agroindústria agropecuária fazendas agricultura pecuária meio ambiente alimentos mineração pesca silvicultura',
             'Jurídica' => 'jurídico advocacia cartório fórum defensoria promotoria consultoria jurídica',
             default => 'empresas serviços organizações',
         };
