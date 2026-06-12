@@ -692,7 +692,7 @@
                 );
 
                 try {
-                    const url = new URL('{{ route('companies.search') }}', window.location.origin);
+                    const url = new URL('{{ route('companies.search', [], false) }}', window.location.origin);
                     if (courseSelect.value) {
                         url.searchParams.set('course_id', courseSelect.value);
                     }
