@@ -70,7 +70,7 @@ class ExampleTest extends TestCase
         ]);
     }
 
-    public function test_registering_a_course_scans_receita_companies_for_area_city_and_state(): void
+    public function test_registering_a_course_does_not_use_the_receita_database(): void
     {
         config(['services.google.maps_api_key' => 'test-key']);
 
@@ -122,12 +122,7 @@ class ExampleTest extends TestCase
             ])
             ->assertRedirect('/');
 
-        $this->assertDatabaseHas('course_companies', [
-            'cnpj' => '12345678000190',
-            'name' => 'Clínica Central',
-            'address' => 'Rua Exemplo 100, Centro, SÃO PAULO - SP, CEP 01000000, Brasil',
-            'phone' => '11 33334444',
-        ]);
+        $this->assertDatabaseCount('course_companies', 0);
     }
 
     public function test_an_authenticated_user_can_update_their_course(): void
@@ -218,7 +213,7 @@ class ExampleTest extends TestCase
         ]);
     }
 
-    public function test_google_maps_key_is_required_for_receita_scanner_geocoding(): void
+    public function test_google_maps_key_is_required_for_google_places(): void
     {
         config(['services.google.maps_api_key' => null]);
 
@@ -233,24 +228,25 @@ class ExampleTest extends TestCase
         $this->actingAs($user)
             ->postJson('/companies/scan', ['course_id' => $course->id])
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Configure GOOGLE_MAPS_API_KEY no arquivo .env para geocodificar os endereços no Google Maps.');
+            ->assertJsonPath('message', 'Configure GOOGLE_MAPS_API_KEY no arquivo .env para consultar o Google Places.');
     }
 
-    public function test_receita_scanner_finds_companies_without_knowing_cnpj(): void
+    public function test_company_search_uses_only_google_places(): void
     {
         config(['services.google.maps_api_key' => 'test-key']);
 
         Http::fake([
-            'maps.googleapis.com/*' => Http::response([
-                'status' => 'OK',
-                'results' => [
+            'places.googleapis.com/*' => Http::response([
+                'places' => [
                     [
-                        'geometry' => [
-                            'location' => [
-                                'lat' => -23.55,
-                                'lng' => -46.63,
-                            ],
-                        ],
+                        'id' => 'google-place-1',
+                        'displayName' => ['text' => 'Clínica Central'],
+                        'formattedAddress' => 'Rua Exemplo, 100 - São Paulo, SP',
+                        'location' => ['latitude' => -23.55, 'longitude' => -46.63],
+                        'primaryTypeDisplayName' => ['text' => 'Clínica'],
+                        'nationalPhoneNumber' => '(11) 3333-4444',
+                        'websiteUri' => 'https://clinica.example',
+                        'googleMapsUri' => 'https://maps.google.com/?cid=1',
                     ],
                 ],
             ]),
@@ -285,13 +281,12 @@ class ExampleTest extends TestCase
         $this->actingAs($user)
             ->postJson('/companies/scan', ['course_id' => $course->id])
             ->assertOk()
-            ->assertJsonPath('provider', 'receita_federal')
+            ->assertJsonPath('provider', 'google_places')
             ->assertJsonPath('scanned', true)
-            ->assertJsonPath('new_companies_count', 1)
             ->assertJsonPath('companies.0.name', 'Clínica Central')
-            ->assertJsonPath('companies.0.cnpj', '12345678000190')
-            ->assertJsonPath('companies.0.email', 'contato@clinica.example')
-            ->assertJsonPath('companies.0.phone', '11 33334444');
+            ->assertJsonPath('companies.0.cnpj', null)
+            ->assertJsonPath('companies.0.source', 'Google Places')
+            ->assertJsonPath('companies.0.phone', '(11) 3333-4444');
 
         $this->actingAs($user)
             ->getJson("/companies/search?course_id={$course->id}")
@@ -299,7 +294,7 @@ class ExampleTest extends TestCase
             ->assertJsonPath('companies.0.name', 'Clínica Central');
     }
 
-    public function test_receita_scanner_requires_a_course(): void
+    public function test_google_places_refresh_requires_a_course(): void
     {
         config(['services.google.maps_api_key' => 'test-key']);
 

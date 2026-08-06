@@ -419,7 +419,7 @@
                             </select>
                         </div>
                         <button type="button" id="search-companies" @disabled($courses->isEmpty() || blank($googleMapsApiKey))>Ver salvas</button>
-                        <button type="button" id="scan-companies" @disabled($courses->isEmpty() || blank($googleMapsApiKey))>Scanner da base Receita</button>
+                        <button type="button" id="scan-companies" @disabled($courses->isEmpty() || blank($googleMapsApiKey))>Atualizar pelo Google Places</button>
                     </div>
 
                     <div class="map-grid">
@@ -721,7 +721,7 @@
                 }
 
                 if (scan && !courseSelect.value) {
-                    setCompanyMessage('Selecione um curso', 'A consulta por CNPJ precisa ser vinculada a um curso cadastrado.');
+                    setCompanyMessage('Selecione um curso', 'A consulta do Google Places precisa ser vinculada a um curso cadastrado.');
                     return;
                 }
 

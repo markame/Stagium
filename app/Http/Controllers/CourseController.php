@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Course;
-use App\Services\ReceitaCompanyScanner;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -13,8 +12,6 @@ use Illuminate\View\View;
 
 class CourseController extends Controller
 {
-    public function __construct(private readonly ReceitaCompanyScanner $scanner) {}
-
     public function index(Request $request): View
     {
         return view('welcome', [
@@ -30,10 +27,9 @@ class CourseController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $course = $request->user()->courses()->create($this->validateCourse($request));
-        $scan = $this->scanner->scan($course, config('services.google.maps_api_key'));
+        $request->user()->courses()->create($this->validateCourse($request));
 
-        return back()->with('status', "Curso cadastrado com sucesso. {$scan['new_companies_count']} empresa(s) encontrada(s) na base da Receita.");
+        return back()->with('status', 'Curso cadastrado com sucesso. Use a busca para consultar empresas no Google Places.');
     }
 
     public function edit(Request $request, Course $course): View
