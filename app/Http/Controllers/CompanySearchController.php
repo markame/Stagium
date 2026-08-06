@@ -3,24 +3,68 @@
 namespace App\Http\Controllers;
 
 use App\Models\Course;
+use App\Models\CourseCompany;
+use App\Services\ReceitaCompanyScanner;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Collection;
 
 class CompanySearchController extends Controller
 {
+    public function __construct(private readonly ReceitaCompanyScanner $scanner) {}
+
     public function __invoke(Request $request): JsonResponse
     {
-        $apiKey = config('services.google.maps_api_key');
+        $courses = $this->coursesForRequest($request);
+        $companies = $this->storedCompaniesFor($courses);
 
-        if (blank($apiKey)) {
+        return $this->companiesResponse($courses, $companies, [
+            'scanned' => false,
+            'new_companies_count' => 0,
+            'skipped_count' => 0,
+        ]);
+    }
+
+    public function scan(Request $request): JsonResponse
+    {
+        if (blank(config('services.google.maps_api_key'))) {
             return response()->json([
-                'message' => 'Configure GOOGLE_MAPS_API_KEY no arquivo .env para usar Google Places API.',
+                'message' => 'Configure GOOGLE_MAPS_API_KEY no arquivo .env para geocodificar os endereços no Google Maps.',
                 'companies' => [],
             ], 422);
         }
 
+        if (! $request->filled('course_id')) {
+            return response()->json([
+                'message' => 'Selecione um curso para executar o scanner da base da Receita.',
+                'companies' => [],
+                'errors' => [
+                    'course_id' => ['Selecione um curso para executar o scanner da base da Receita.'],
+                ],
+            ], 422);
+        }
+
+        $course = Course::where('coordinator_id', $request->user()->id)
+            ->findOrFail((int) $request->input('course_id'));
+
+        $result = $this->scanner->scan($course, config('services.google.maps_api_key'));
+
+        $courses = new EloquentCollection([$course]);
+        $companies = $this->storedCompaniesFor($courses);
+
+        return $this->companiesResponse($courses, $companies, [
+            'scanned' => true,
+            'new_companies_count' => $result['new_companies_count'],
+            'skipped_count' => $result['skipped_count'],
+        ]);
+    }
+
+    /**
+     * @return EloquentCollection<int, Course>
+     */
+    private function coursesForRequest(Request $request): EloquentCollection
+    {
         $validated = $request->validate([
             'course_id' => ['nullable', 'integer'],
         ]);
@@ -34,96 +78,74 @@ class CompanySearchController extends Controller
             abort(404);
         }
 
-        $companies = $courses
-            ->flatMap(fn (Course $course): array => $this->googleCompaniesFor($course, $apiKey))
-            ->unique(fn (array $company): string => strtolower($company['name'].'|'.($company['address'] ?? '').'|'.$company['lat'].'|'.$company['lng']))
-            ->values()
-            ->all();
-
-        return response()->json([
-            'provider' => 'google',
-            'courses_count' => $courses->count(),
-            'center' => $this->centerFromCompanies($companies),
-            'companies' => $companies,
-        ]);
+        return $courses;
     }
 
     /**
-     * @return array<int, array{name: string, type: string|null, lat: float, lng: float, address: string|null, phone: string|null, international_phone: string|null, website_url: string|null, maps_url: string|null, source: string, course: array{id: int, name: string, area: string, city: string|null, state: string|null}}>
+     * @param  EloquentCollection<int, Course>  $courses
+     * @return Collection<int, array<string, mixed>>
      */
-    private function googleCompaniesFor(Course $course, string $apiKey): array
+    private function storedCompaniesFor(EloquentCollection $courses): Collection
     {
-        $cacheKey = "google.companies.{$course->id}.{$course->updated_at?->timestamp}";
+        if ($courses->isEmpty()) {
+            return collect();
+        }
 
-        return Cache::remember($cacheKey, now()->addHours(6), function () use ($course, $apiKey) {
-            $response = Http::acceptJson()
-                ->timeout(30)
-                ->withHeaders([
-                    'X-Goog-Api-Key' => $apiKey,
-                    'X-Goog-FieldMask' => 'places.displayName,places.formattedAddress,places.location,places.primaryType,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.googleMapsUri',
-                ])
-                ->post('https://places.googleapis.com/v1/places:searchText', [
-                    'textQuery' => $this->queryForCourse($course),
-                    'languageCode' => 'pt-BR',
-                    'regionCode' => 'BR',
-                    'maxResultCount' => 20,
-                ]);
-
-            if (! $response->successful()) {
-                return [];
-            }
-
-            return collect($response->json('places', []))
-                ->map(function (array $place) use ($course): ?array {
-                    $location = $place['location'] ?? [];
-                    $lat = $location['latitude'] ?? null;
-                    $lng = $location['longitude'] ?? null;
-                    $name = $place['displayName']['text'] ?? null;
-
-                    if ($lat === null || $lng === null || blank($name)) {
-                        return null;
-                    }
-
-                    return [
-                        'name' => $name,
-                        'type' => $place['primaryType'] ?? null,
-                        'lat' => (float) $lat,
-                        'lng' => (float) $lng,
-                        'address' => $place['formattedAddress'] ?? null,
-                        'phone' => $place['nationalPhoneNumber'] ?? null,
-                        'international_phone' => $place['internationalPhoneNumber'] ?? null,
-                        'website_url' => $place['websiteUri'] ?? null,
-                        'maps_url' => $place['googleMapsUri'] ?? null,
-                        'source' => 'Google Places',
-                        'course' => [
-                            'id' => $course->id,
-                            'name' => $course->name,
-                            'area' => $course->area,
-                            'city' => $course->city,
-                            'state' => $course->state,
-                        ],
-                    ];
-                })
-                ->filter()
-                ->values()
-                ->all();
-        });
+        return CourseCompany::with('course')
+            ->whereIn('course_id', $courses->pluck('id'))
+            ->orderBy('course_id')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (CourseCompany $company): array => $this->formatCompany($company));
     }
 
-    private function queryForCourse(Course $course): string
+    /**
+     * @param  EloquentCollection<int, Course>  $courses
+     * @param  Collection<int, array<string, mixed>>  $companies
+     * @param  array<string, mixed>  $extra
+     */
+    private function companiesResponse(EloquentCollection $courses, Collection $companies, array $extra = []): JsonResponse
     {
-        $term = match ($course->area) {
-            'Saúde' => 'saúde hospital clínica consultório laboratório farmácia odontologia fisioterapia psicologia enfermagem estética medicamentos cuidado humano',
-            'Informação e Comunicação' => 'informação comunicação informática tecnologia da informação software hardware redes telecomunicações internet suporte técnico dados mídia comunicação visual',
-            'Gestão e Negócios' => 'gestão negócios administração contabilidade consultoria recursos humanos financeiro banco comércio escritório',
-            'Controle e Processos Industriais' => 'indústria fábrica manutenção automação controle de qualidade produção mecânica elétrica processos industriais',
-            'Infraestrutura' => 'infraestrutura construção engenharia arquitetura obras saneamento energia logística transporte manutenção predial',
-            'Produção e Recursos Naturais' => 'produção recursos naturais agronegócio agroindústria agropecuária fazendas agricultura pecuária meio ambiente alimentos mineração pesca silvicultura',
-            'Jurídica' => 'jurídico advocacia cartório fórum defensoria promotoria consultoria jurídica',
-            default => 'empresas serviços organizações',
-        };
+        return response()->json(array_merge([
+            'provider' => 'receita_federal',
+            'courses_count' => $courses->count(),
+            'center' => $this->centerFromCompanies($companies->all()),
+            'companies' => $companies->values()->all(),
+        ], $extra));
+    }
 
-        return "{$course->name} {$course->area} {$term} empresas públicas privadas em {$course->city}, {$course->state}, Brasil";
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatCompany(CourseCompany $company): array
+    {
+        return [
+            'id' => $company->id,
+            'cnpj' => $company->cnpj,
+            'name' => $company->name,
+            'corporate_name' => $company->corporate_name,
+            'trade_name' => $company->trade_name,
+            'type' => $company->type,
+            'cnae_code' => $company->cnae_code,
+            'registration_status' => $company->registration_status,
+            'lat' => $company->lat,
+            'lng' => $company->lng,
+            'address' => $company->address,
+            'email' => $company->email,
+            'phone' => $company->phone,
+            'international_phone' => $company->international_phone,
+            'website_url' => $company->website_url,
+            'maps_url' => $company->maps_url,
+            'source' => $company->source,
+            'last_scanned_at' => $company->last_scanned_at?->toISOString(),
+            'course' => [
+                'id' => $company->course->id,
+                'name' => $company->course->name,
+                'area' => $company->course->area,
+                'city' => $company->course->city,
+                'state' => $company->course->state,
+            ],
+        ];
     }
 
     /**

@@ -1,0 +1,75 @@
+{
+  "input": "C:\\Users\\Marcos\\Downloads\\1 Termo de Encaminhamento 2026.docx",
+  "fonts_by_char_count": {
+    "Times New Roman": 893
+  },
+  "direct_run_formatting_runs": 16,
+  "direct_paragraph_formatting_paragraphs": 14,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 2,
+      "text": "ENCAMINHAMENTO PARA EST\u00c1GIO",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "ENCAMINHAMENTO PARA EST\u00c1GIO",
+        "style": "Normal"
+      },
+      {
+        "para_index": 6,
+        "run_text": "Conforme a Lei 11.788 (Lei do Est\u00e1gio) em seu Art. 1\u00ba o \u201cEst\u00e1gio \u00e9 um ato educat",
+        "style": "Normal"
+      },
+      {
+        "para_index": 7,
+        "run_text": "Em decorr\u00eancia do conv\u00eanio celebrado entre o Instituto de Educa\u00e7\u00e3o, Ci\u00eancia e Te",
+        "style": "Normal"
+      },
+      {
+        "para_index": 9,
+        "run_text": "Atenciosamente,",
+        "style": "Normal"
+      },
+      {
+        "para_index": 12,
+        "run_text": "xxxxxx",
+        "style": "Normal"
+      }
+    ],
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 4,
+        "text": "Prezada (a) Senhor(a),",
+        "style": "Normal (Web)"
+      },
+      {
+        "para_index": 5,
+        "text": "\t",
+        "style": "Normal (Web)"
+      },
+      {
+        "para_index": 6,
+        "text": "Conforme a Lei 11.788 (Lei do Est\u00e1gio) em seu Art. 1\u00ba o \u201cEst\u00e1gio \u00e9 um ato educativo escolar supervisionado, desenvolvido",
+        "style": "Normal"
+      },
+      {
+        "para_index": 7,
+        "text": "Em decorr\u00eancia do conv\u00eanio celebrado entre o Instituto de Educa\u00e7\u00e3o, Ci\u00eancia e Tecnologia do Maranh\u00e3o \u2013 IEMA e a XXXXX - ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 8,
+        "text": "",
+        "style": "Normal"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

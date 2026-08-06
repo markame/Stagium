@@ -34,4 +34,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(Course::class, 'coordinator_id');
     }
+
+    public function students(): HasMany
+    {
+        return $this->hasMany(Student::class, 'coordinator_id');
+    }
+
+    public function companies(): HasMany
+    {
+        return $this->hasMany(Company::class, 'coordinator_id');
+    }
 }

@@ -189,9 +189,34 @@
 
             .search-row {
                 display: grid;
-                grid-template-columns: 1fr 180px;
+                grid-template-columns: 1fr 160px 220px;
                 align-items: end;
                 gap: 16px;
+            }
+
+            .scanner-field {
+                margin-top: 16px;
+            }
+
+            textarea {
+                display: block;
+                width: 100%;
+                min-height: 92px;
+                margin-top: 8px;
+                border: 1px solid var(--field-border);
+                border-radius: 6px;
+                background: var(--surface);
+                color: var(--text);
+                padding: 10px 12px;
+                font: inherit;
+                font-size: 14px;
+                resize: vertical;
+                outline: none;
+            }
+
+            textarea:focus {
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
             }
 
             label {
@@ -359,6 +384,8 @@
 
                     <nav class="tabs" aria-label="Navegação principal">
                         <a href="{{ route('courses.index') }}" class="tab active">Início</a>
+                        <a href="{{ route('students.index') }}" class="tab">Alunos</a>
+                        <a href="{{ route('companies.index') }}" class="tab">Empresas</a>
                         <a href="{{ route('profile.edit') }}" class="tab">Meus dados</a>
                         <form action="{{ route('logout') }}" method="POST" class="logout-form">
                             @csrf
@@ -391,7 +418,8 @@
                                 @endforeach
                             </select>
                         </div>
-                        <button type="button" id="search-companies" @disabled($courses->isEmpty() || blank($googleMapsApiKey))>Buscar empresas</button>
+                        <button type="button" id="search-companies" @disabled($courses->isEmpty() || blank($googleMapsApiKey))>Ver salvas</button>
+                        <button type="button" id="scan-companies" @disabled($courses->isEmpty() || blank($googleMapsApiKey))>Scanner da base Receita</button>
                     </div>
 
                     <div class="map-grid">
@@ -519,6 +547,7 @@
             const citySelect = document.getElementById('city');
             const courseSelect = document.getElementById('map-course');
             const searchButton = document.getElementById('search-companies');
+            const scanButton = document.getElementById('scan-companies');
             const companyList = document.getElementById('company-list');
             const hasGoogleMapsKey = @json(filled($googleMapsApiKey));
             let map = null;
@@ -640,8 +669,11 @@
                             <strong>${escapeHtml(company.name)}</strong><br>
                             ${escapeHtml(course.name || 'Curso')}<br>
                             ${escapeHtml(course.area || '')}<br>
+                            ${company.cnpj ? `CNPJ: ${escapeHtml(company.cnpj)}<br>` : ''}
+                            ${company.registration_status ? `Situação: ${escapeHtml(company.registration_status)}<br>` : ''}
                             ${escapeHtml(company.type || 'empresa')}<br>
                             ${escapeHtml(company.address || '')}
+                            ${company.email ? `<br>E-mail: ${escapeHtml(company.email)}` : ''}
                             ${phone ? `<br>Telefone: ${escapeHtml(phone)}` : ''}
                             ${website}
                         `);
@@ -656,8 +688,11 @@
                     const phone = company.phone || company.international_phone || '';
                     item.innerHTML = `
                         <p class="company-name">${escapeHtml(company.name)}</p>
+                        ${company.cnpj ? `<p class="company-meta">CNPJ: ${escapeHtml(company.cnpj)}</p>` : ''}
                         ${courseText ? `<p class="company-meta">${escapeHtml(courseText)}</p>` : ''}
+                        ${company.registration_status ? `<p class="company-meta">Situação: ${escapeHtml(company.registration_status)}</p>` : ''}
                         <p class="company-meta">${escapeHtml(company.type || 'empresa')}${company.address ? ' - ' + escapeHtml(company.address) : ''}</p>
+                        ${company.email ? `<p class="company-meta">E-mail: ${escapeHtml(company.email)}</p>` : ''}
                         ${phone ? `<p class="company-meta">Telefone: ${escapeHtml(phone)}</p>` : ''}
                         ${source ? `<p class="company-meta">${source}</p>` : ''}
                         ${company.website_url ? `<a class="company-link" href="${escapeHtml(company.website_url)}" target="_blank" rel="noreferrer">Site da empresa</a>` : ''}
@@ -674,7 +709,7 @@
                 map.fitBounds(bounds);
             }
 
-            async function searchCompanies() {
+            async function searchCompanies(scan = false) {
                 if (!hasGoogleMapsKey || !map) {
                     setCompanyMessage('Google Places não configurado', 'Configure GOOGLE_MAPS_API_KEY no arquivo .env para habilitar o mapa e a busca.');
                     return;
@@ -685,22 +720,35 @@
                     return;
                 }
 
+                if (scan && !courseSelect.value) {
+                    setCompanyMessage('Selecione um curso', 'A consulta por CNPJ precisa ser vinculada a um curso cadastrado.');
+                    return;
+                }
+
                 searchButton.disabled = true;
+                scanButton.disabled = true;
                 setCompanyMessage('Buscando empresas...', courseSelect.value
                     ? 'Consultando Google Places para a cidade e área do curso.'
                     : 'Consultando Google Places para todos os cursos cadastrados.'
                 );
 
                 try {
-                    const url = new URL('{{ route('companies.search', [], false) }}', window.location.origin);
+                    const url = new URL(scan ? '{{ route('companies.scan', [], false) }}' : '{{ route('companies.search', [], false) }}', window.location.origin);
                     if (courseSelect.value) {
                         url.searchParams.set('course_id', courseSelect.value);
                     }
+                    const body = scan ? new URLSearchParams({
+                        course_id: courseSelect.value,
+                    }) : undefined;
 
                     const response = await fetch(url, {
+                        method: scan ? 'POST' : 'GET',
                         headers: {
                             'Accept': 'application/json',
+                            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
                         },
+                        body,
                     });
 
                     const data = await response.json();
@@ -721,13 +769,15 @@
                     setCompanyMessage('Busca indisponível', error.message);
                 } finally {
                     searchButton.disabled = false;
+                    scanButton.disabled = false;
                 }
             }
 
             stateSelect.addEventListener('change', () => {
                 fillCities();
             });
-            searchButton?.addEventListener('click', searchCompanies);
+            searchButton?.addEventListener('click', () => searchCompanies(false));
+            scanButton?.addEventListener('click', () => searchCompanies(true));
 
             if (stateSelect.value) {
                 fillCities(citySelect.dataset.selected);
@@ -738,6 +788,7 @@
             if (!hasGoogleMapsKey) {
                 setCompanyMessage('Google Places não configurado', 'Configure GOOGLE_MAPS_API_KEY no arquivo .env para habilitar o mapa e a busca.');
                 searchButton.disabled = true;
+                scanButton.disabled = true;
             }
         </script>
         @if (filled($googleMapsApiKey))

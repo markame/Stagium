@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Course;
+use App\Models\ReceitaCompany;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -69,6 +70,66 @@ class ExampleTest extends TestCase
         ]);
     }
 
+    public function test_registering_a_course_scans_receita_companies_for_area_city_and_state(): void
+    {
+        config(['services.google.maps_api_key' => 'test-key']);
+
+        Http::fake([
+            'servicodados.ibge.gov.br/*' => Http::response([
+                ['nome' => 'São Paulo'],
+            ]),
+            'maps.googleapis.com/*' => Http::response([
+                'status' => 'OK',
+                'results' => [
+                    [
+                        'geometry' => [
+                            'location' => [
+                                'lat' => -23.55,
+                                'lng' => -46.63,
+                            ],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        ReceitaCompany::create([
+            'cnpj' => '12345678000190',
+            'corporate_name' => 'Clínica Central LTDA',
+            'trade_name' => 'Clínica Central',
+            'registration_status' => 'Ativa',
+            'cnae_code' => '8630503',
+            'cnae_description' => 'Atividade médica ambulatorial',
+            'state' => 'SP',
+            'city' => 'SÃO PAULO',
+            'street_type' => 'Rua',
+            'street' => 'Exemplo',
+            'number' => '100',
+            'district' => 'Centro',
+            'zip_code' => '01000000',
+            'email' => 'contato@clinica.example',
+            'phone' => '11 33334444',
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/courses', [
+                'name' => 'Técnico em Enfermagem',
+                'area' => Course::AREAS[0],
+                'state' => 'SP',
+                'city' => 'São Paulo',
+            ])
+            ->assertRedirect('/');
+
+        $this->assertDatabaseHas('course_companies', [
+            'cnpj' => '12345678000190',
+            'name' => 'Clínica Central',
+            'address' => 'Rua Exemplo 100, Centro, SÃO PAULO - SP, CEP 01000000, Brasil',
+            'phone' => '11 33334444',
+        ]);
+    }
+
     public function test_an_authenticated_user_can_update_their_course(): void
     {
         Http::fake([
@@ -79,15 +140,15 @@ class ExampleTest extends TestCase
 
         $user = User::factory()->create();
         $course = $user->courses()->create([
-            'name' => 'Tecnico em Enfermagem',
+            'name' => 'Técnico em Enfermagem',
             'area' => Course::AREAS[0],
             'state' => 'SP',
-            'city' => 'Sao Paulo',
+            'city' => 'São Paulo',
         ]);
 
         $this->actingAs($user)
             ->put("/courses/{$course->id}", [
-                'name' => 'Tecnico em Informatica',
+                'name' => 'Técnico em Informática',
                 'area' => Course::AREAS[1],
                 'state' => 'SP',
                 'city' => 'Campinas',
@@ -96,7 +157,7 @@ class ExampleTest extends TestCase
 
         $this->assertDatabaseHas('courses', [
             'id' => $course->id,
-            'name' => 'Tecnico em Informatica',
+            'name' => 'Técnico em Informática',
             'area' => Course::AREAS[1],
             'state' => 'SP',
             'city' => 'Campinas',
@@ -108,10 +169,10 @@ class ExampleTest extends TestCase
     {
         $user = User::factory()->create();
         $course = $user->courses()->create([
-            'name' => 'Tecnico em Enfermagem',
+            'name' => 'Técnico em Enfermagem',
             'area' => Course::AREAS[0],
             'state' => 'SP',
-            'city' => 'Sao Paulo',
+            'city' => 'São Paulo',
         ]);
 
         $this->actingAs($user)
@@ -128,10 +189,10 @@ class ExampleTest extends TestCase
         $owner = User::factory()->create();
         $otherUser = User::factory()->create();
         $course = $owner->courses()->create([
-            'name' => 'Tecnico em Enfermagem',
+            'name' => 'Técnico em Enfermagem',
             'area' => Course::AREAS[0],
             'state' => 'SP',
-            'city' => 'Sao Paulo',
+            'city' => 'São Paulo',
         ]);
 
         $this->actingAs($otherUser)
@@ -157,7 +218,7 @@ class ExampleTest extends TestCase
         ]);
     }
 
-    public function test_google_places_key_is_required_for_company_search(): void
+    public function test_google_maps_key_is_required_for_receita_scanner_geocoding(): void
     {
         config(['services.google.maps_api_key' => null]);
 
@@ -170,29 +231,25 @@ class ExampleTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->getJson("/companies/search?course_id={$course->id}")
+            ->postJson('/companies/scan', ['course_id' => $course->id])
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Configure GOOGLE_MAPS_API_KEY no arquivo .env para usar Google Places API.');
+            ->assertJsonPath('message', 'Configure GOOGLE_MAPS_API_KEY no arquivo .env para geocodificar os endereços no Google Maps.');
     }
 
-    public function test_an_authenticated_user_can_search_companies_with_google_places(): void
+    public function test_receita_scanner_finds_companies_without_knowing_cnpj(): void
     {
         config(['services.google.maps_api_key' => 'test-key']);
 
         Http::fake([
-            'places.googleapis.com/*' => Http::response([
-                'places' => [
+            'maps.googleapis.com/*' => Http::response([
+                'status' => 'OK',
+                'results' => [
                     [
-                        'displayName' => ['text' => 'Clínica Central'],
-                        'formattedAddress' => 'Rua Exemplo, 100 - São Paulo, SP',
-                        'primaryType' => 'clinic',
-                        'nationalPhoneNumber' => '(11) 3333-4444',
-                        'internationalPhoneNumber' => '+55 11 3333-4444',
-                        'websiteUri' => 'https://clinica.example.com',
-                        'googleMapsUri' => 'https://maps.google.com/?cid=123',
-                        'location' => [
-                            'latitude' => -23.55,
-                            'longitude' => -46.63,
+                        'geometry' => [
+                            'location' => [
+                                'lat' => -23.55,
+                                'lng' => -46.63,
+                            ],
                         ],
                     ],
                 ],
@@ -207,73 +264,49 @@ class ExampleTest extends TestCase
             'city' => 'São Paulo',
         ]);
 
+        ReceitaCompany::create([
+            'cnpj' => '12345678000190',
+            'corporate_name' => 'Clínica Central LTDA',
+            'trade_name' => 'Clínica Central',
+            'registration_status' => 'Ativa',
+            'cnae_code' => '8630503',
+            'cnae_description' => 'Atividade médica ambulatorial',
+            'state' => 'SP',
+            'city' => 'SÃO PAULO',
+            'street_type' => 'Rua',
+            'street' => 'Exemplo',
+            'number' => '100',
+            'district' => 'Centro',
+            'zip_code' => '01000000',
+            'email' => 'contato@clinica.example',
+            'phone' => '11 33334444',
+        ]);
+
+        $this->actingAs($user)
+            ->postJson('/companies/scan', ['course_id' => $course->id])
+            ->assertOk()
+            ->assertJsonPath('provider', 'receita_federal')
+            ->assertJsonPath('scanned', true)
+            ->assertJsonPath('new_companies_count', 1)
+            ->assertJsonPath('companies.0.name', 'Clínica Central')
+            ->assertJsonPath('companies.0.cnpj', '12345678000190')
+            ->assertJsonPath('companies.0.email', 'contato@clinica.example')
+            ->assertJsonPath('companies.0.phone', '11 33334444');
+
         $this->actingAs($user)
             ->getJson("/companies/search?course_id={$course->id}")
             ->assertOk()
-            ->assertJsonPath('provider', 'google')
-            ->assertJsonPath('companies.0.name', 'Clínica Central')
-            ->assertJsonPath('companies.0.phone', '(11) 3333-4444')
-            ->assertJsonPath('companies.0.international_phone', '+55 11 3333-4444')
-            ->assertJsonPath('companies.0.website_url', 'https://clinica.example.com');
+            ->assertJsonPath('companies.0.name', 'Clínica Central');
     }
-    public function test_company_search_without_course_filter_loads_all_user_courses(): void
+
+    public function test_receita_scanner_requires_a_course(): void
     {
         config(['services.google.maps_api_key' => 'test-key']);
 
-        Http::fake([
-            'places.googleapis.com/*' => Http::sequence()
-                ->push([
-                    'places' => [
-                        [
-                            'displayName' => ['text' => 'Hospital Central'],
-                            'formattedAddress' => 'Rua Saude, 100 - Sao Paulo, SP',
-                            'primaryType' => 'hospital',
-                            'googleMapsUri' => 'https://maps.google.com/?cid=123',
-                            'location' => [
-                                'latitude' => -23.55,
-                                'longitude' => -46.63,
-                            ],
-                        ],
-                    ],
-                ])
-                ->push([
-                    'places' => [
-                        [
-                            'displayName' => ['text' => 'Empresa de Tecnologia'],
-                            'formattedAddress' => 'Rua Dados, 200 - Campinas, SP',
-                            'primaryType' => 'software_company',
-                            'googleMapsUri' => 'https://maps.google.com/?cid=456',
-                            'location' => [
-                                'latitude' => -22.9,
-                                'longitude' => -47.06,
-                            ],
-                        ],
-                    ],
-                ]),
-        ]);
-
         $user = User::factory()->create();
-        $user->courses()->create([
-            'name' => 'Tecnico em Enfermagem',
-            'area' => Course::AREAS[0],
-            'state' => 'SP',
-            'city' => 'Sao Paulo',
-        ]);
-        $user->courses()->create([
-            'name' => 'Tecnico em Informatica',
-            'area' => Course::AREAS[1],
-            'state' => 'SP',
-            'city' => 'Campinas',
-        ]);
 
         $this->actingAs($user)
-            ->getJson('/companies/search')
-            ->assertOk()
-            ->assertJsonPath('provider', 'google')
-            ->assertJsonPath('courses_count', 2)
-            ->assertJsonPath('companies.0.name', 'Hospital Central')
-            ->assertJsonPath('companies.1.name', 'Empresa de Tecnologia');
-
-        Http::assertSentCount(2);
+            ->postJson('/companies/scan', [])
+            ->assertStatus(422);
     }
 }
