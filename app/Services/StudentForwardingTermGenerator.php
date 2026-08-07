@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Student;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use setasign\Fpdi\Fpdi;
 
@@ -33,23 +34,23 @@ class StudentForwardingTermGenerator
             $pdf->useTemplate($template);
             $pdf->SetTextColor(0, 0, 0);
 
-            $body = 'Em decorrência do convênio celebrado entre o Instituto de Educação, Ciência e Tecnologia do Maranhão – IEMA e a '.$company->corporate_name.', informamos que o estágio iniciará nesta empresa no dia '.$date->translatedFormat('d').' de '.$date->translatedFormat('F').' do corrente ano. Estamos encaminhando para realização de estágio o(s) estudante(s):';
+            $body = 'Em decorrência do convênio celebrado entre o Instituto de Educação, Ciência e Tecnologia do Maranhão – IEMA e a '.(string) $company->corporate_name.', informamos que o estágio iniciará nesta empresa no dia '.$date->translatedFormat('d').' de '.$date->translatedFormat('F').' do corrente ano. Estamos encaminhando para realização de estágio o(s) estudante(s):';
             $this->writeFittedParagraph($pdf, 20, 109, 170, 29, $body);
 
             $pdf->SetFont('Times', 'B', 12);
             foreach ($pageStudents->values() as $index => $student) {
                 throw_unless($student->course, RuntimeException::class, 'Todos os alunos selecionados devem possuir um curso.');
                 $y = 150.5 + ($index * 7.2);
-                $this->writeFittedCell($pdf, 22, $y, 91, 7, $student->name, 'L', 'B');
-                $this->writeFittedCell($pdf, 117, $y, 71, 7, $student->course->name, 'L', 'B');
+                $this->writeFittedCell($pdf, 22, $y, 91, 7, (string) $student->name, 'L', 'B');
+                $this->writeFittedCell($pdf, 117, $y, 71, 7, (string) $student->course->name, 'L', 'B');
             }
 
             $pdf->SetFont('Times', '', 12);
-            $this->writeFittedCell($pdf, 55, 205.3, 100, 7, $data['manager_name'], 'C');
-            $this->writeFittedCell($pdf, 38, 213.7, 134, 7, 'Gestor(a) Geral do IEMA Pleno '.$data['iema_unit'], 'C');
-            $this->writeFittedCell($pdf, 31, 230.5, 155, 7, $company->responsible_name, 'L');
-            $this->writeFittedCell($pdf, 20, 239.2, 168, 7, $company->responsible_name, 'L');
-            $this->writeFittedCell($pdf, 20, 247.8, 168, 7, $data['responsible_role'], 'L');
+            $this->writeFittedCell($pdf, 55, 205.3, 100, 7, (string) $data['manager_name'], 'C');
+            $this->writeFittedCell($pdf, 38, 213.7, 134, 7, 'Gestor(a) Geral do IEMA Pleno '.(string) $data['iema_unit'], 'C');
+            $this->writeFittedCell($pdf, 31, 230.5, 155, 7, (string) $company->responsible_name, 'L');
+            $this->writeFittedCell($pdf, 20, 239.2, 168, 7, (string) $company->responsible_name, 'L');
+            $this->writeFittedCell($pdf, 20, 247.8, 168, 7, (string) $data['responsible_role'], 'L');
             }
 
             $pdf->Output('F', $outputPath);
@@ -58,6 +59,11 @@ class StudentForwardingTermGenerator
             return $outputPath;
         } catch (\Throwable $exception) {
             File::deleteDirectory($workDirectory);
+            Log::error('Falha ao gerar Termo de Encaminhamento.', [
+                'company_id' => $company->id,
+                'student_ids' => $students->pluck('id')->all(),
+                'exception' => $exception,
+            ]);
 
             if ($exception instanceof RuntimeException) {
                 throw $exception;
@@ -123,6 +129,8 @@ class StudentForwardingTermGenerator
 
     private function encode(string $text): string
     {
-        return iconv('UTF-8', 'Windows-1252//TRANSLIT', $text) ?: $text;
+        $text = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+
+        return iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $text) ?: '';
     }
 }
