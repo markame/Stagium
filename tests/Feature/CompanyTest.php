@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
+use App\Models\StudentDocument;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -77,6 +78,23 @@ class CompanyTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get("/companies/{$company->id}/edit")
             ->assertNotFound();
+    }
+
+    public function test_company_list_displays_its_linked_students_without_duplicates(): void
+    {
+        $user = User::factory()->create();
+        $course = $user->courses()->create(['name'=>'Informática','area'=>'Tecnologia','state'=>'MA','city'=>'São Luís']);
+        $student = $user->students()->create(['course_id'=>$course->id,'name'=>'Ana Vinculada','cpf'=>'12345678901']);
+        $company = $user->companies()->create($this->normalizedData());
+        foreach ([StudentDocument::FORWARDING_TERM, StudentDocument::COMMITMENT_TERM] as $type) {
+            $student->documents()->create(['company_id'=>$company->id,'type'=>$type,'original_name'=>'termo.pdf','path'=>'test/termo.pdf']);
+        }
+
+        $this->actingAs($user)->get('/companies')
+            ->assertOk()
+            ->assertSee('1 aluno(s)')
+            ->assertSee('Ana Vinculada')
+            ->assertSee('Informática');
     }
 
     /** @return array<string, string> */

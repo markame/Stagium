@@ -14,7 +14,10 @@ class CompanyController extends Controller
     public function index(Request $request): View
     {
         return view('companies.index', [
-            'companies' => $request->user()->companies()->orderBy('corporate_name')->get(),
+            'companies' => $request->user()->companies()
+                ->with(['studentDocuments.student.course'])
+                ->orderBy('corporate_name')
+                ->get(),
         ]);
     }
 
