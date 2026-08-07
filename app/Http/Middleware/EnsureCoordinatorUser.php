@@ -10,7 +10,10 @@ class EnsureCoordinatorUser
 {
     public function handle(Request $request, Closure $next): Response
     {
-        abort_if($request->user()?->isStudent(), 403);
+        if ($request->user()?->isStudent()) {
+            return redirect()->route('student.portal');
+        }
+
         return $next($request);
     }
 }

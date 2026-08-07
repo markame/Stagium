@@ -12,6 +12,19 @@ class StudentPortalTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_student_login_ignores_an_intended_coordinator_page(): void
+    {
+        $coordinator = User::factory()->create();
+        $course = $coordinator->courses()->create(['name' => 'Informática', 'area' => 'Tecnologia', 'state' => 'MA', 'city' => 'São Luís']);
+        $coordinator->students()->create(['course_id' => $course->id, 'name' => 'Ana', 'cpf' => '12345678901']);
+
+        $this->get('/')->assertRedirect('/login');
+        $this->post('/login', ['identifier' => '12345678901', 'password' => '12345678901'])
+            ->assertRedirect(route('student.portal'));
+
+        $this->get('/')->assertRedirect(route('student.portal'));
+    }
+
     public function test_coordinator_can_create_an_exclusive_student_account(): void
     {
         $coordinator = User::factory()->create();
@@ -28,7 +41,7 @@ class StudentPortalTest extends TestCase
     {
         [$coordinator, $student, $account, $company] = $this->portalData();
         $this->actingAs($coordinator)->get('/aluno')->assertForbidden();
-        $this->actingAs($account)->get('/')->assertForbidden();
+        $this->actingAs($account)->get('/')->assertRedirect(route('student.portal'));
         $this->actingAs($account)->get('/aluno')->assertOk()->assertSee('Aluno Portal');
 
         $this->actingAs($account)->postJson('/aluno/ponto', ['latitude' => -2.53001, 'longitude' => -44.30001])

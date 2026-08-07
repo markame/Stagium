@@ -129,8 +129,12 @@ class StudentForwardingTermGenerator
 
     private function encode(string $text): string
     {
-        $text = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+        $encoded = iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $text);
 
-        return iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $text) ?: '';
+        if ($encoded !== false) {
+            return $encoded;
+        }
+
+        return preg_replace('/[^\x20-\x7E]/', '', $text) ?? '';
     }
 }

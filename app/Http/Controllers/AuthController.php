@@ -36,7 +36,13 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(Auth::user()->isStudent() ? route('student.portal') : route('courses.index'));
+        if (Auth::user()->isStudent()) {
+            $request->session()->forget('url.intended');
+
+            return redirect()->route('student.portal');
+        }
+
+        return redirect()->intended(route('courses.index'));
     }
 
     public function register(): View
