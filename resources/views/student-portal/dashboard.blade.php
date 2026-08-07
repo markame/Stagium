@@ -73,7 +73,7 @@
         'name' => $company->corporate_name,
     ] : null;
 @endphp
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9coqIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 (() => {
     const company = @json($mapCompany);
@@ -101,6 +101,12 @@
     }
 
     const updatePosition = position => {
+        if (!window.L || !map) {
+            setStatus('O mapa não pôde ser carregado. Atualize a página e tente novamente.', 'error');
+            locateButton.disabled = false;
+            return;
+        }
+
         currentPosition = {latitude:position.coords.latitude, longitude:position.coords.longitude};
         const point = L.latLng(currentPosition.latitude, currentPosition.longitude);
         const companyPoint = L.latLng(company.latitude, company.longitude);
@@ -120,6 +126,10 @@
     };
 
     const locate = () => {
+        if (!window.L) {
+            setStatus('O mapa não pôde ser carregado. Verifique sua conexão e atualize a página.', 'error');
+            return;
+        }
         if (!company || !navigator.geolocation) {
             setStatus('Este aparelho não oferece geolocalização.', 'error');
             return;
