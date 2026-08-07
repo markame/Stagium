@@ -29,15 +29,15 @@
         <main class="card">
             <p class="brand">Stagium</p>
             <h1>Entrar</h1>
-            <p class="hint">Acesse sua conta para cadastrar e acompanhar seus cursos.</p>
+            <p class="hint">Coordenadores entram com e-mail. Alunos entram usando o CPF como usuário e senha inicial.</p>
 
             <form action="{{ route('login.store') }}" method="POST">
                 @csrf
 
                 <div class="field">
-                    <label for="email">E-mail</label>
-                    <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus>
-                    @error('email')
+                    <label for="identifier">CPF ou e-mail</label>
+                    <input id="identifier" name="identifier" value="{{ old('identifier') }}" required autofocus autocomplete="username" placeholder="CPF do aluno ou e-mail do coordenador">
+                    @error('identifier')
                         <p class="error">{{ $message }}</p>
                     @enderror
                 </div>

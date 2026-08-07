@@ -56,7 +56,7 @@ class StudentCommitmentTermGenerator
         $this->replace($pdf, 135, 136.2, 52, 6.5, $this->formatCnpj($company->cnpj));
         $this->replace($pdf, 21.5, 149.7, 111, 6.5, $company->responsible_name);
         $this->replace($pdf, 135, 149.7, 52, 6.5, $this->formatCpf($company->responsible_cpf));
-        $this->replace($pdf, 21.5, 163.2, 111, 6.5, $company->address);
+        $this->replace($pdf, 21.5, 163.2, 111, 6.5, $company->formattedAddress());
         $this->replace($pdf, 135, 163.2, 52, 6.5, $data['company_zip']);
         $this->replace($pdf, 21.5, 176.7, 111, 6.5, $data['company_neighborhood']);
         $this->replace($pdf, 135, 176.7, 22, 6.5, $data['company_city']);

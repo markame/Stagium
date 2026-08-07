@@ -9,6 +9,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentDocumentController;
 use App\Http\Controllers\StudentCommitmentTermController;
+use App\Http\Controllers\StudentPortalController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function (): void {
@@ -18,7 +19,7 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/register', [AuthController::class, 'store'])->name('register.store');
 });
 
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', 'coordinator'])->group(function (): void {
     Route::get('/', [CourseController::class, 'index'])->name('courses.index');
     Route::post('/courses', [CourseController::class, 'store'])->name('courses.store');
     Route::get('/courses/{course}/edit', [CourseController::class, 'edit'])->name('courses.edit');
@@ -43,6 +44,7 @@ Route::middleware('auth')->group(function (): void {
     Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])->name('companies.destroy');
     Route::get('/company-documents', [CompanyDocumentController::class, 'index'])->name('companies.documents.index');
     Route::post('/companies/{company}/documents/{type}', [CompanyDocumentController::class, 'store'])->name('companies.documents.store');
+    Route::post('/companies/{company}/official-documents', [CompanyDocumentController::class, 'generateOfficial'])->name('companies.documents.generate-official');
     Route::get('/company-documents/{document}/download', [CompanyDocumentController::class, 'download'])->name('companies.documents.download');
     Route::get('/company-documents/{company}/download-all', [CompanyDocumentController::class, 'downloadAll'])->name('companies.documents.download-all');
     Route::delete('/company-documents/{document}', [CompanyDocumentController::class, 'destroy'])->name('companies.documents.destroy');
@@ -57,4 +59,9 @@ Route::middleware('auth')->group(function (): void {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});
+
+Route::middleware(['auth', 'student'])->prefix('aluno')->group(function (): void {
+    Route::get('/', [StudentPortalController::class, 'index'])->name('student.portal');
+    Route::post('/ponto', [StudentPortalController::class, 'mark'])->name('student.time-log.mark');
 });

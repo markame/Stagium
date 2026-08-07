@@ -43,6 +43,32 @@ class CompanyTest extends TestCase
         $this->assertDatabaseCount('companies', 1);
     }
 
+    public function test_company_address_can_be_registered_in_separate_fields(): void
+    {
+        $user = User::factory()->create();
+        $data = $this->validData();
+        unset($data['address']);
+        $data += [
+            'address_street' => 'Avenida Principal',
+            'address_number' => '250',
+            'address_neighborhood' => 'Centro',
+            'address_zip' => '65000-000',
+            'address_complement' => 'Sala 4',
+        ];
+
+        $this->actingAs($user)->post('/companies', $data)->assertRedirect('/companies');
+
+        $this->assertDatabaseHas('companies', [
+            'coordinator_id' => $user->id,
+            'address_street' => 'Avenida Principal',
+            'address_number' => '250',
+            'address_neighborhood' => 'Centro',
+            'address_zip' => '65000000',
+            'address_complement' => 'Sala 4',
+            'address' => 'Avenida Principal, 250, Centro, Sala 4, CEP 65000-000',
+        ]);
+    }
+
     public function test_a_user_cannot_edit_another_users_company(): void
     {
         $owner = User::factory()->create();

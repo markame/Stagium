@@ -10,9 +10,14 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use setasign\Fpdi\Fpdi;
+use App\Services\CompanyOfficialDocumentsGenerator;
+use Illuminate\Support\Facades\File;
+use RuntimeException;
 
 class CompanyDocumentController extends Controller
 {
+    public function __construct(private readonly CompanyOfficialDocumentsGenerator $officialGenerator) {}
+
     public function index(Request $request): View
     {
         $search = trim((string) $request->input('q'));
@@ -85,6 +90,37 @@ class CompanyDocumentController extends Controller
 
         return redirect()->route('companies.documents.index', ['company_id' => $company->id])
             ->with('status', 'Documento anexado com sucesso.');
+    }
+
+    public function generateOfficial(Request $request, Company $company): RedirectResponse
+    {
+        $this->authorizeCompany($request, $company);
+        $data = $request->validate([
+            'agreement_number' => ['required','string','max:20'], 'ci_number' => ['required','string','max:20'],
+            'iema_unit' => ['required','string','max:150'], 'iema_code' => ['required','string','max:40'],
+            'manager_name' => ['required','string','max:255'], 'vacancies' => ['required','integer','min:1','max:999'],
+            'document_date' => ['required','date'], 'issuing_authority' => ['required','string','max:50'],
+            'business_area' => ['required','string','max:150'], 'company_city' => ['required','string','max:100'],
+            'company_state' => ['required','string','size:2'], 'company_zip' => ['required','string','max:20'],
+            'company_email' => ['required','email','max:255'], 'shipping_address' => ['required','string','max:255'],
+            'shipping_city' => ['required','string','max:100'], 'shipping_state' => ['required','string','size:2'],
+            'shipping_zip' => ['required','string','max:20'], 'delivery_responsible' => ['required','string','max:255'],
+            'delivery_phone' => ['required','string','max:30'], 'delivery_email' => ['required','email','max:255'],
+        ]);
+        try {
+            $generated = $this->officialGenerator->generate($company, $data);
+            foreach ($generated as $type => $temporaryPath) {
+                $old = $company->documents()->where('type', $type)->first();
+                $path = 'company-documents/'.$company->id.'/generated-'.$type.'-'.now()->format('YmdHis').'.pdf';
+                Storage::disk('local')->put($path, File::get($temporaryPath));
+                $company->documents()->updateOrCreate(['type' => $type], ['original_name' => $type.'-'.$company->id.'.pdf', 'path' => $path, 'mime_type' => 'application/pdf', 'size' => File::size($temporaryPath)]);
+                if ($old && $old->path !== $path) Storage::disk('local')->delete($old->path);
+            }
+            File::deleteDirectory(dirname(reset($generated)));
+        } catch (RuntimeException $exception) {
+            return back()->withInput()->withErrors(['generation' => $exception->getMessage()]);
+        }
+        return redirect()->route('companies.documents.index',['company_id'=>$company->id])->with('status','Minuta, Formulário de Celebração e C.I. gerados em PDF.');
     }
 
     public function download(Request $request, CompanyDocument $document): StreamedResponse

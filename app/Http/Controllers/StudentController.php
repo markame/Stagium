@@ -11,6 +11,7 @@ use App\Services\StudentCsvImporter;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
 
 class StudentController extends Controller
 {
@@ -43,7 +44,9 @@ class StudentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $request->user()->students()->create($this->validatedData($request));
+        DB::transaction(function () use ($request): void {
+            $student = $request->user()->students()->create($this->validatedData($request));
+        });
 
         return redirect()->route('students.index')->with('status', 'Aluno cadastrado com sucesso.');
     }
@@ -92,7 +95,7 @@ class StudentController extends Controller
         $this->ensureStudentBelongsToUser($request, $student);
 
         return view('students.edit', [
-            'student' => $student,
+            'student' => $student->load('userAccount'),
             'courses' => $request->user()->courses()->orderBy('name')->get(),
         ]);
     }
@@ -100,7 +103,9 @@ class StudentController extends Controller
     public function update(Request $request, Student $student): RedirectResponse
     {
         $this->ensureStudentBelongsToUser($request, $student);
-        $student->update($this->validatedData($request, $student));
+        DB::transaction(function () use ($request, $student): void {
+            $student->update($this->validatedData($request, $student));
+        });
 
         return redirect()->route('students.index')->with('status', 'Aluno atualizado com sucesso.');
     }
@@ -158,4 +163,5 @@ class StudentController extends Controller
     {
         abort_unless($student->coordinator_id === $request->user()->id, 404);
     }
+
 }

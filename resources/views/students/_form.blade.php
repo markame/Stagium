@@ -77,4 +77,6 @@
         <input id="parentage" name="parentage" type="text" value="{{ old('parentage', $student->parentage ?? '') }}" maxlength="255" required placeholder="Nome da mãe, do pai ou responsáveis">
         @error('parentage') <p class="error">{{ $message }}</p> @enderror
     </div>
+
+    <div class="field field-wide"><strong>Acesso exclusivo do aluno</strong><p class="hint">Usuário e senha inicial: CPF do aluno, utilizando somente os 11 números.</p></div>
 </div>
