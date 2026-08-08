@@ -33,6 +33,17 @@ class StudentPortalTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_student_cannot_access_coordinator_dashboard_or_change_internship_company(): void
+    {
+        [$coordinator, $student, $account, $company] = $this->portalData();
+
+        $this->actingAs($account)->get('/dashboard')->assertRedirect(route('student.portal'));
+        $this->actingAs($account)->put("/students/{$student->id}/internship-company", ['company_id'=>$company->id])
+            ->assertRedirect(route('student.portal'));
+
+        $this->assertNull($student->fresh()->internship_company_id);
+    }
+
     public function test_coordinator_can_create_an_exclusive_student_account(): void
     {
         $coordinator = User::factory()->create();
