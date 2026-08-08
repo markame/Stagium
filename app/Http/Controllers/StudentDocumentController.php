@@ -87,6 +87,7 @@ class StudentDocumentController extends Controller
         StudentDocument::whereIn('student_id', $students->pluck('id'))
             ->where('type', StudentDocument::FORWARDING_TERM)->delete();
         foreach ($students as $student) {
+            $student->update(['internship_company_id' => $company->id]);
             $student->documents()->create([
                 'company_id' => $company->id,
                 'type' => StudentDocument::FORWARDING_TERM,

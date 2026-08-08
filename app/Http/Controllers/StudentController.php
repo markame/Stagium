@@ -24,8 +24,9 @@ class StudentController extends Controller
 
         return view('students.index', [
             'courses' => $request->user()->courses()->orderBy('name')->get(),
+            'companies' => $request->user()->companies()->orderBy('corporate_name')->get(),
             'students' => $request->user()->students()
-                ->with('course')
+                ->with(['course', 'internshipCompany'])
                 ->when($search !== '', function ($query) use ($search, $searchDigits): void {
                     $query->where(function ($query) use ($search, $searchDigits): void {
                         $query->where('name', 'like', "%{$search}%")
@@ -120,6 +121,17 @@ class StudentController extends Controller
         $student->delete();
 
         return redirect()->route('students.index')->with('status', 'Aluno excluído com sucesso.');
+    }
+
+    public function updateInternshipCompany(Request $request, Student $student): RedirectResponse
+    {
+        $this->ensureStudentBelongsToUser($request, $student);
+        $data = $request->validate([
+            'company_id' => ['nullable', Rule::exists('companies', 'id')->where(fn ($query) => $query->where('coordinator_id', $request->user()->id))],
+        ]);
+        $student->update(['internship_company_id' => $data['company_id'] ?? null]);
+
+        return back()->with('status', 'Vínculo de estágio do aluno atualizado com sucesso.');
     }
 
     /** @return array<string, mixed> */

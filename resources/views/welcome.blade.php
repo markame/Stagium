@@ -383,6 +383,7 @@
                     </div>
 
                     <nav class="tabs" aria-label="Navegação principal">
+                        <a href="{{ route('dashboard') }}" class="tab">Dashboard</a>
                         <a href="{{ route('courses.index') }}" class="tab active">Início</a>
                         <a href="{{ route('students.index') }}" class="tab">Alunos</a>
                         <a href="{{ route('companies.index') }}" class="tab">Empresas</a>

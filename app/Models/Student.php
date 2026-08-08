@@ -36,6 +36,7 @@ class Student extends Model
     protected $fillable = [
         'coordinator_id',
         'course_id',
+        'internship_company_id',
         'name',
         'address',
         'phone',
@@ -62,6 +63,11 @@ class Student extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function internshipCompany(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'internship_company_id');
     }
 
     public function documents(): HasMany

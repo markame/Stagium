@@ -25,6 +25,14 @@ class StudentPortalTest extends TestCase
         $this->get('/')->assertRedirect(route('student.portal'));
     }
 
+    public function test_student_can_log_out(): void
+    {
+        [, , $account] = $this->portalData();
+
+        $this->actingAs($account)->post('/logout')->assertRedirect('/login');
+        $this->assertGuest();
+    }
+
     public function test_coordinator_can_create_an_exclusive_student_account(): void
     {
         $coordinator = User::factory()->create();

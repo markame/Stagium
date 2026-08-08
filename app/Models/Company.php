@@ -58,4 +58,9 @@ class Company extends Model
     {
         return $this->hasMany(StudentDocument::class);
     }
+
+    public function interns(): HasMany
+    {
+        return $this->hasMany(Student::class, 'internship_company_id');
+    }
 }

@@ -47,6 +47,7 @@
                     </div>
 
                     <nav class="tabs" aria-label="Navegação principal">
+                        <a href="{{ route('dashboard') }}" class="tab">Dashboard</a>
                         <a href="{{ route('courses.index') }}" class="tab">Cursos</a>
                         <a href="{{ route('profile.edit') }}" class="tab active">Meus dados</a>
                         <form action="{{ route('logout') }}" method="POST" class="logout-form">

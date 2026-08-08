@@ -73,6 +73,18 @@ class StudentTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_coordinator_can_change_the_students_internship_company(): void
+    {
+        $user = User::factory()->create();
+        $student = $user->students()->create(['course_id'=>$this->courseFor($user)->id,'name'=>'Ana','cpf'=>'12345678901']);
+        $company = $user->companies()->create(['cnpj'=>'12345678000190','corporate_name'=>'Nova Empresa LTDA','trade_name'=>'Nova Empresa','phone'=>'98999999999','address'=>'Rua A','responsible_name'=>'Maria','responsible_cpf'=>'98765432100','responsible_rg'=>'123','responsible_address'=>'Rua B','responsible_phone'=>'98988888888']);
+
+        $this->actingAs($user)->put("/students/{$student->id}/internship-company", ['company_id'=>$company->id])
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseHas('students', ['id'=>$student->id,'internship_company_id'=>$company->id]);
+    }
+
     private function courseFor(User $user): Course
     {
         return $user->courses()->create([

@@ -13,11 +13,11 @@ class StudentPortalController extends Controller
 {
     public function index(Request $request): View
     {
-        $student = $request->user()->student()->with('course')->firstOrFail();
+        $student = $request->user()->student()->with(['course', 'internshipCompany'])->firstOrFail();
         $document = $student->documents()->with('company')->whereIn('type', [StudentDocument::COMMITMENT_TERM, StudentDocument::FORWARDING_TERM])->latest()->first();
         return view('student-portal.dashboard', [
             'student' => $student,
-            'company' => $document?->company,
+            'company' => $student->internshipCompany ?? $document?->company,
             'logs' => $student->timeLogs()->with('company')->latest('logged_at')->limit(30)->get(),
             'lastLog' => $student->timeLogs()->latest('logged_at')->first(),
         ]);
@@ -27,8 +27,7 @@ class StudentPortalController extends Controller
     {
         $data = $request->validate(['latitude' => ['required', 'numeric', 'between:-90,90'], 'longitude' => ['required', 'numeric', 'between:-180,180']]);
         $student = $request->user()->student;
-        $document = $student->documents()->with('company')->whereIn('type', [StudentDocument::COMMITMENT_TERM, StudentDocument::FORWARDING_TERM])->latest()->firstOrFail();
-        $company = $document->company;
+        $company = $student->internshipCompany ?? $student->documents()->with('company')->whereIn('type', [StudentDocument::COMMITMENT_TERM, StudentDocument::FORWARDING_TERM])->latest()->firstOrFail()->company;
         abort_unless($company && $company->latitude !== null && $company->longitude !== null, 422, 'A localização da empresa ainda não foi configurada.');
         $distance = $geo->distanceMeters((float) $data['latitude'], (float) $data['longitude'], (float) $company->latitude, (float) $company->longitude);
         if ($distance > $company->attendance_radius_meters) {

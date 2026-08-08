@@ -194,6 +194,7 @@
                     </div>
 
                     <nav class="tabs" aria-label="Navegação principal">
+                        <a href="{{ route('dashboard') }}" class="tab">Dashboard</a>
                         <a href="{{ route('courses.index') }}" class="tab active">Início</a>
                         <a href="{{ route('profile.edit') }}" class="tab">Meus dados</a>
                     </nav>

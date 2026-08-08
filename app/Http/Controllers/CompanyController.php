@@ -15,7 +15,7 @@ class CompanyController extends Controller
     {
         return view('companies.index', [
             'companies' => $request->user()->companies()
-                ->with(['studentDocuments.student.course'])
+                ->with(['studentDocuments.student.course', 'interns.course'])
                 ->orderBy('corporate_name')
                 ->get(),
         ]);

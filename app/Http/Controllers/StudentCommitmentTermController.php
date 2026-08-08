@@ -71,6 +71,7 @@ class StudentCommitmentTermController extends Controller
             'company_id' => $company->id, 'original_name' => 'termo-compromisso-'.$student->id.'.pdf',
             'path' => $path, 'generation_data' => $data,
         ]);
+        $student->update(['internship_company_id' => $company->id]);
         if ($old && $old->path !== $path) {
             Storage::disk('local')->delete($old->path);
         }
