@@ -25,7 +25,7 @@ class CompanyDocumentController extends Controller
         $companyQuery = $request->user()->companies();
         $hasCompanies = (clone $companyQuery)->exists();
         $companies = $companyQuery
-            ->with('documents')
+            ->with(['documents', 'officialDocumentData'])
             ->when($search !== '', function ($query) use ($search, $searchDigits): void {
                 $query->where(function ($query) use ($search, $searchDigits): void {
                     $query->where('trade_name', 'like', "%{$search}%")
@@ -107,20 +107,34 @@ class CompanyDocumentController extends Controller
             'shipping_zip' => ['required','string','max:20'], 'delivery_responsible' => ['required','string','max:255'],
             'delivery_phone' => ['required','string','max:30'], 'delivery_email' => ['required','email','max:255'],
         ]);
+        $company->officialDocumentData()->updateOrCreate([], ['data' => $data]);
+
+        foreach ($company->documents()->whereIn('type', $this->officialTypes())->get() as $oldDocument) {
+            Storage::disk('local')->delete($oldDocument->path);
+            $oldDocument->delete();
+        }
+
+        return redirect()->route('companies.documents.index', ['company_id' => $company->id])
+            ->with('status', 'Dados dos documentos oficiais salvos. Os PDFs serão criados somente no download.');
+    }
+
+    public function downloadOfficial(Request $request, Company $company, string $type): StreamedResponse
+    {
+        $this->authorizeCompany($request, $company);
+        abort_unless(in_array($type, $this->officialTypes(), true), 404);
+        abort_unless($company->officialDocumentData, 404, 'Salve os dados dos documentos oficiais antes de baixar.');
+
         try {
-            $generated = $this->officialGenerator->generate($company, $data);
-            foreach ($generated as $type => $temporaryPath) {
-                $old = $company->documents()->where('type', $type)->first();
-                $path = 'company-documents/'.$company->id.'/generated-'.$type.'-'.now()->format('YmdHis').'.pdf';
-                Storage::disk('local')->put($path, File::get($temporaryPath));
-                $company->documents()->updateOrCreate(['type' => $type], ['original_name' => $type.'-'.$company->id.'.pdf', 'path' => $path, 'mime_type' => 'application/pdf', 'size' => File::size($temporaryPath)]);
-                if ($old && $old->path !== $path) Storage::disk('local')->delete($old->path);
-            }
+            $generated = $this->officialGenerator->generate($company, $company->officialDocumentData->data);
+            $content = File::get($generated[$type]);
             File::deleteDirectory(dirname(reset($generated)));
         } catch (RuntimeException $exception) {
-            return back()->withInput()->withErrors(['generation' => $exception->getMessage()]);
+            abort(422, $exception->getMessage());
         }
-        return redirect()->route('companies.documents.index',['company_id'=>$company->id])->with('status','Minuta, Formulário de Celebração e C.I. gerados em PDF.');
+
+        return response()->streamDownload(function () use ($content): void {
+            echo $content;
+        }, $type.'-'.$company->id.'.pdf', ['Content-Type' => 'application/pdf']);
     }
 
     public function download(Request $request, CompanyDocument $document): StreamedResponse
@@ -140,18 +154,20 @@ class CompanyDocumentController extends Controller
         $types = array_keys(CompanyDocument::TYPES);
         $types = array_values(array_filter($types, fn (string $type) => $type !== 'minuta_termo'));
         $documents = $company->documents()->whereIn('type', $types)->get()->keyBy('type');
-        abort_if($documents->isEmpty(), 404, 'Nenhum documento disponível para unificação.');
+        $generated = $company->officialDocumentData
+            ? $this->officialGenerator->generate($company, $company->officialDocumentData->data)
+            : [];
+        abort_if($documents->isEmpty() && $generated === [], 404, 'Nenhum documento disponível para unificação.');
 
         $pdf = new Fpdi();
 
         foreach ($types as $type) {
             $document = $documents->get($type);
+            $path = $document ? Storage::disk('local')->path($document->path) : ($generated[$type] ?? null);
 
-            if (! $document) {
+            if (! $path) {
                 continue;
             }
-
-            $path = Storage::disk('local')->path($document->path);
             abort_unless(is_file($path), 404);
             $pageCount = $pdf->setSourceFile($path);
 
@@ -164,6 +180,9 @@ class CompanyDocumentController extends Controller
         }
 
         $content = $pdf->Output('S');
+        if ($generated !== []) {
+            File::deleteDirectory(dirname(reset($generated)));
+        }
         $filename = 'documentos-empresa-'.$company->id.'.pdf';
 
         return response()->streamDownload(function () use ($content): void {
@@ -185,5 +204,10 @@ class CompanyDocumentController extends Controller
     private function authorizeCompany(Request $request, Company $company): void
     {
         abort_unless($company->coordinator_id === $request->user()->id, 404);
+    }
+
+    private function officialTypes(): array
+    {
+        return ['minuta_termo', 'formulario_celebracao', 'solicitacao_convenio'];
     }
 }

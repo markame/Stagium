@@ -48,6 +48,7 @@ Route::middleware(['auth', 'coordinator'])->group(function (): void {
     Route::get('/company-documents', [CompanyDocumentController::class, 'index'])->name('companies.documents.index');
     Route::post('/companies/{company}/documents/{type}', [CompanyDocumentController::class, 'store'])->name('companies.documents.store');
     Route::post('/companies/{company}/official-documents', [CompanyDocumentController::class, 'generateOfficial'])->name('companies.documents.generate-official');
+    Route::get('/companies/{company}/official-documents/{type}/download', [CompanyDocumentController::class, 'downloadOfficial'])->name('companies.documents.download-official');
     Route::get('/company-documents/{document}/download', [CompanyDocumentController::class, 'download'])->name('companies.documents.download');
     Route::get('/company-documents/{company}/download-all', [CompanyDocumentController::class, 'downloadAll'])->name('companies.documents.download-all');
     Route::delete('/company-documents/{document}', [CompanyDocumentController::class, 'destroy'])->name('companies.documents.destroy');
